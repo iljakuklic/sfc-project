@@ -1,0 +1,92 @@
+#!/bin/bash
+
+# url encoding function
+function urlenc { python -c 'import sys, urllib as ul; print ul.quote_plus(sys.argv[1])' "$*"; }
+
+DIR=$(dirname "$0")
+TAGPROG="$DIR/audiotag"
+CLASSIFIER="$DIR/../../build/src/classifier"
+
+LFM_API_KEY="$(< "$DIR/api_key")"
+LFM_BASE_URI="http://ws.audioscrobbler.com/2.0/"
+LFM_BASE="$LFM_BASE_URI?api_key=$LFM_API_KEY"
+
+[ -x "$CLASSIFIER" ] || {
+    echo "Classifier is not built"
+    exit 1
+}
+
+[ -x "$TAGPROG" ] || {
+    pushd "$DIR" >/dev/null
+    echo compiling audio tag utility
+    c++ --std='c++98' -ltag -I/usr/include/taglib audiotag.cpp -o audiotag || exit 1
+    popd >/dev/null
+}
+
+# get last.fm API url for a request
+# params: API function name and its params as key-value pairs
+function lfm_url {
+    local X="$LFM_BASE&method=$1"
+    shift 1
+
+    while [ "$#" != 0 ]; do
+        X="${X}&${1}=`urlenc "${2}"`"
+        shift 2
+    done
+
+    echo "$X"
+}
+
+# last.fm API query
+# params: API function name and its params as key-value pairs
+function lfm_call {
+    curl "`lfm_url "$@"`"
+}
+
+# query lats.fm tags for given audio file (artist and title metadata must be present)
+# params: single audio file
+function tags_for_file {
+    [ -r "$1" ] || return 1
+    echo '<tagset>'
+    lfm_call artist.gettoptags artist "`$TAGPROG artist "$1"`" | sed -n '2,$ p'
+    lfm_call  track.gettoptags artist "`$TAGPROG artist "$1"`" track "`$TAGPROG title "$1"`" | sed -n '2,$ p'
+    echo '</tagset>'
+}
+
+# process number of audio files:
+# 1. generate tags file for artist / track
+# 2. merge artist / track tag files
+# 3. convert file to .vaw
+function process_files {
+    local f
+    for f in "$@"; do
+        [ -r "$f" ] || continue
+        local fname=$(basename "$f") # input filename
+        local fbase=${fname%.*}      # base filename
+        local flfm="$fbase.lfm"      # raw last.fm data file
+        local ftag="$fbase.tag"      # processed tags file
+        local dfea="$fbase.dat"      # output feature file
+
+        echo "<<<< Processing $fname >>>>"
+
+        # download tags from last.fm if needed
+        [ -f "$flfm" ] || tags_for_file "$f" >"$flfm"
+
+        # process tag file
+        #[ "$ftag" -ot "$flfm" ] &&
+        xsltproc "$DIR/tagproc.xsl" "$flfm" >"$ftag"
+
+        # convert to wav
+        #[ "$fout" -ot "$f" ] &&
+        ffmpeg -i "$f" -ac 1 -ss 00:02 "$fout"
+
+        # convert to .dat
+        # [ "$dfea" -ot "$fout" ] &&
+        # TODO
+
+        echo
+    done
+}
+
+process_files "$@"
+# cat *.dat >data.fea
