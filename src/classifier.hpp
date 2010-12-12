@@ -49,6 +49,63 @@ class Classifier {
         /// get output labels
         const LabelList& labels() const;
 
+    public:
+        
+        /// Classifier learning context
+        class Teacher {
+            public:
+                typedef std::auto_ptr<NeuralNet::Teacher> NetTeacherPtr;
+                typedef const DataSet& DataSetRef;
+
+            public:
+
+                /**
+                 * constructor
+                 * @param c Classifier to train
+                 * @param train training data set
+                 * @param test testing data set
+                 * @param xval crossvalidation data set
+                 */
+                explicit Teacher(Classifier& c, DataSetRef train, DataSetRef test, DataSetRef xval);
+
+                /**
+                 * present several samples and propagate through the network
+                 * @param n number of samples to present
+                 * @param offset the index of the first sample form trainig set to present
+                 * @param learning_rate neural network learning rate
+                 */
+                void present(size_t n, size_t offset, Real learning_rate);
+
+                /**
+                 * train classifier with training dataset split into chunks by n samples
+                 * @param n number of samples to present at a time, whole training set if 0
+                 * @param learning_rate neural network learning rate
+                 */
+                void present(size_t n, Real learning_rate);
+
+                /**
+                 * train classifier with training dataset split into chunks by n samples,
+                 * dynamically adjusting learning rate and stopping when error stops falling
+                 * @param n number of samples to present at a time, whole training set if 0
+                 * @param init_learning_rate initial neural network learning rate
+                 */
+                void teach(size_t n, Real init_learning_rate);
+
+                /// calculate error on training data
+                Real train_error() const;
+                /// calculate error on test data
+                Real test_error() const;
+                /// calculate error on crossvalidation data
+                Real xval_error() const;
+
+            private:
+                Classifier& cls;
+                NetTeacherPtr net;
+                DataSetRef train, test, xval;
+        };
+
+        friend class Teacher;
+
     private:
         NeuralNet nn;          ///< neural network
         Vector mean_, stddev_; ///< normalization constants
