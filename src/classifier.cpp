@@ -70,12 +70,17 @@ std::ostream& operator<<(std::ostream& os, const Classifier& c)
 Classifier::Teacher::Teacher(Classifier& c, const NeuralNet& network, DataSetRef train, DataSetRef test, DataSetRef xval) :
     cls(c), train(train), test(test), xval(xval)
 {
+    if (train.count() == 0) throw std::runtime_error("No tarining data!");
     c.nn = network;
+    c.mean_ = train.mean();
+    c.stddev_ = train.stddev();
+    c.labels_.resize(train.sample(0).second.size());
     net = NetTeacherPtr(new NeuralNet::Teacher(c.nn));
 }
 
 void Classifier::Teacher::present(size_t n, size_t offset, Real learning_rate)
 {
+    if (n == 0) n = train.count();
     size_t end = std::min(offset + n, train.count());
     for (size_t i = offset; i < end; ++i)
         net->sample(train.sample(i).first, train.sample(i).second);
@@ -84,23 +89,33 @@ void Classifier::Teacher::present(size_t n, size_t offset, Real learning_rate)
 
 void Classifier::Teacher::present(size_t n, Real learning_rate)
 {
+    if (n == 0) n = train.count();
     for (size_t i = 0; i < train.count(); i += n) present(n, i, learning_rate);
 }
 
-void Classifier::Teacher::teach(size_t n, Real rate)
+bool Classifier::Teacher::teach(size_t n, Real rate)
 {
-    const Real thres = 0.995;
+    const Real thres = 0.9999;
+    int max_iter = 10000;
     int miss = 0; // miss count
-    Real err = 0.0, olderr = xval_error();
+    Real err = 0.0, olderr = xval_error(), err_ratio;
+    Real initerr = olderr;
 
-    while (miss < 2) {
-        present(n, rate);
-        err = xval_error();
-        if (err / olderr > thres) ++miss;
+    while (miss < 3) {
+        if (!--max_iter) return false;
+        std::cout << "Miss: " << miss << ", Error: " << err << ", Rate: " << rate << std::endl;
+        present(n, rate);   // training iteration
+        err = xval_error(); // classifier error
+        err_ratio = err / olderr;
+        if (err_ratio > thres) ++miss;
         else miss = 0;
-        if (miss) rate *= 0.5;
+        if (miss) rate *= 0.5; // adjust learning rate
+        else if (err_ratio < .98) rate *= 2.0;
         olderr = err;
     }
+
+    if (err > initerr) return false;
+    return true;
 }
 
 Real Classifier::Teacher::train_error() const { return cls.error(train); }

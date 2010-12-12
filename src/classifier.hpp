@@ -90,7 +90,7 @@ class Classifier {
                  * @param n number of samples to present at a time, whole training set if 0
                  * @param init_learning_rate initial neural network learning rate
                  */
-                void teach(size_t n, Real init_learning_rate);
+                bool teach(size_t n, Real init_learning_rate);
 
                 /// calculate error on training data
                 Real train_error() const;
