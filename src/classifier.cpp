@@ -67,8 +67,12 @@ std::ostream& operator<<(std::ostream& os, const Classifier& c)
 }
 
 
-Classifier::Teacher::Teacher(Classifier& c, DataSetRef train, DataSetRef test, DataSetRef xval) :
-    cls(c), net(new NeuralNet::Teacher(c.nn)), train(train), test(test), xval(xval) {}
+Classifier::Teacher::Teacher(Classifier& c, const NeuralNet& network, DataSetRef train, DataSetRef test, DataSetRef xval) :
+    cls(c), train(train), test(test), xval(xval)
+{
+    c.nn = network;
+    net = NetTeacherPtr(new NeuralNet::Teacher(c.nn));
+}
 
 void Classifier::Teacher::present(size_t n, size_t offset, Real learning_rate)
 {
@@ -83,9 +87,20 @@ void Classifier::Teacher::present(size_t n, Real learning_rate)
     for (size_t i = 0; i < train.count(); i += n) present(n, i, learning_rate);
 }
 
-void Classifier::Teacher::teach(size_t n, Real init_learning_rate)
+void Classifier::Teacher::teach(size_t n, Real rate)
 {
-    assert(false);
+    const Real thres = 0.995;
+    int miss = 0; // miss count
+    Real err = 0.0, olderr = xval_error();
+
+    while (miss < 2) {
+        present(n, rate);
+        err = xval_error();
+        if (err / olderr > thres) ++miss;
+        else miss = 0;
+        if (miss) rate *= 0.5;
+        olderr = err;
+    }
 }
 
 Real Classifier::Teacher::train_error() const { return cls.error(train); }

@@ -66,7 +66,7 @@ class Classifier {
                  * @param test testing data set
                  * @param xval crossvalidation data set
                  */
-                explicit Teacher(Classifier& c, DataSetRef train, DataSetRef test, DataSetRef xval);
+                explicit Teacher(Classifier& c, const NeuralNet& network, DataSetRef train, DataSetRef test, DataSetRef xval);
 
                 /**
                  * present several samples and propagate through the network
@@ -86,6 +86,7 @@ class Classifier {
                 /**
                  * train classifier with training dataset split into chunks by n samples,
                  * dynamically adjusting learning rate and stopping when error stops falling
+                 * (implements New Bob algorithm)
                  * @param n number of samples to present at a time, whole training set if 0
                  * @param init_learning_rate initial neural network learning rate
                  */
