@@ -7,14 +7,77 @@
 
 
 
-#include "features.hpp"
-#include "neuralnet.hpp"
+#include "classifier.hpp"
 #include <iostream>
 #include <iomanip>
 #include <boost/numeric/ublas/io.hpp>
 
+struct params {
+    void(*mode)(params&);
+    std::string prog;
+};
+
+void prog_help(params& p)
+{
+    std::cout << p.prog << " <mode> <switches>" << std::endl
+              << " mode is one of: train, classify, dataset, help" << std::endl
+              << "" << std::endl
+              << "" << std::endl;
+}
+
+void foo(params& p)
+{
+    Classifier c;
+
+    {
+        NNLayer::Vector vin(2), vout(1);
+        DataSet data;
+        vin(0) = -1; vin(1) = -1; vout(0) =  1; data.add_sample(vin, vout);
+        vin(0) = -1; vin(1) =  0; vout(0) = -1; data.add_sample(vin, vout);
+        vin(0) = -1; vin(1) =  1; vout(0) =  1; data.add_sample(vin, vout);
+        vin(0) =  0; vin(1) = -1; vout(0) = -1; data.add_sample(vin, vout);
+        vin(0) =  0; vin(1) =  0; vout(0) = -1; data.add_sample(vin, vout);
+        vin(0) =  0; vin(1) =  1; vout(0) = -1; data.add_sample(vin, vout);
+        vin(0) =  1; vin(1) = -1; vout(0) =  1; data.add_sample(vin, vout);
+        vin(0) =  1; vin(1) =  0; vout(0) = -1; data.add_sample(vin, vout);
+        vin(0) =  1; vin(1) =  1; vout(0) =  1; data.add_sample(vin, vout);
+        data.normalize_all();
+        //data.write_tmp(std::cout);
+        std::cout << std::endl;
+
+        NeuralNet nn(2, 4, 1);
+        Classifier::Teacher t(c, nn, data, data, data);
+        t.teach(0, .02);
+    }
+
+    Classifier::Vector v;
+    while (std::cin >> v) std::cout << c.exec(v) << std::endl;
+}
+
+void parse_params(int argc, char** argv, params& p)
+{
+    p.prog = argv[0];
+    if (argc < 2) throw std::runtime_error("Mode needs to be specified, try: " + p.prog + " help");
+
+    std::string str = argv[1];
+         if (str == "help") p.mode = prog_help;
+    else if (str == "foo")  p.mode = foo;
+}
+
 int main(int argc, char** argv)
 {
+
+    try {
+        params p;
+        parse_params(argc, argv, p);
+        p.mode(p);
+    } catch (std::runtime_error& e) {
+        std::cout << "ERROR: " << e.what() << std::endl;
+        return 1;
+    }
+
+
+/*
     if (argc == 2) {
         LabelList l; l.push_back("rock"); l.push_back("pop");
         DataSet data;
@@ -29,24 +92,11 @@ int main(int argc, char** argv)
         return 0;
     }
 
-    NeuralNet nn(2, 3, 1);
-    NNLayer::Vector v, vin(2), vout(1);
+
+
     NeuralNet::Teacher t(nn);
     NeuralNet nn2 = nn;
     std::cout << nn << std::endl;
-    for (size_t i = 0; i < 1000000; ++i) {
-        vin(0) = -1; vin(1) = -1; vout(0) =  1; t.sample(vin, vout);
-        vin(0) = -1; vin(1) =  0; vout(0) = -1; t.sample(vin, vout);
-        vin(0) = -1; vin(1) =  1; vout(0) =  1; t.sample(vin, vout);
-        vin(0) =  0; vin(1) = -1; vout(0) = -1; t.sample(vin, vout);
-        vin(0) =  0; vin(1) =  0; vout(0) = -1; t.sample(vin, vout);
-        vin(0) =  0; vin(1) =  1; vout(0) = -1; t.sample(vin, vout);
-        vin(0) =  1; vin(1) = -1; vout(0) =  1; t.sample(vin, vout);
-        vin(0) =  1; vin(1) =  0; vout(0) = -1; t.sample(vin, vout);
-        vin(0) =  1; vin(1) =  1; vout(0) =  1; t.sample(vin, vout);
-        t.teach(.1);
-        if (i % 1000 == 0) std::cout << i << ": " << nn << std::endl;
-    }
     std::cout << nn << std::endl;
     while (std::cin >> v)
         std::cout << nn2.exec(v) << " " << nn.exec(v) << std::endl;
@@ -57,6 +107,7 @@ int main(int argc, char** argv)
         std::cout << "Frame " << std::setw(4) << n << ": " << v;
         std::cout << std::endl;
     }
+*/
     return 0;
 }
 
