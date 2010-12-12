@@ -32,6 +32,11 @@ class Classifier {
         /// classify dataset
         Vector exec(const DataSet& data) const;
 
+        /// classification error of an data frame
+        Real error(const Vector& in, const Vector& out) const;
+        /// classification error of an dataset
+        Real error(const DataSet& data) const;
+
         /// load from input stream
         void load(std::istream& is);
 

@@ -31,6 +31,20 @@ Classifier::Vector Classifier::exec(const DataSet& data) const
     return element_div(sum, scalar_vector<Real>(sum.size(), data.count()));
 }
 
+Real Classifier::error(const Vector& in, const Vector& out) const
+{
+    Vector err = out - exec(in);
+    return sum(element_prod(err, err)); // err^2
+}
+
+Real Classifier::error(const DataSet& data) const
+{
+    Real err = 0.0;
+    for (size_t i = 0; i < data.count(); ++i)
+        err += error(data.sample(i).first, data.sample(i).second);
+    return err;
+}
+
 void Classifier::load(std::istream& is)
 {
     std::string str;
@@ -48,7 +62,7 @@ std::istream& operator>>(std::istream& is, Classifier& c) { c.load(is); return i
 
 std::ostream& operator<<(std::ostream& os, const Classifier& c)
 {
-    for (size_t i; i < c.labels().size(); ++i) { if (i) os << LABEL_DELIM; os << c.labels()[i]; }
+    for (size_t i = 0; i < c.labels().size(); ++i) { if (i) os << LABEL_DELIM; os << c.labels()[i]; }
     return os << std::endl << c.mean() << ' ' << c.stddev() << std::endl << c.neural_net();
 }
 
