@@ -10,6 +10,7 @@
 #include "layer.hpp"
 
 #include <cmath>
+#include <ctime>
 #include <cstdlib>
 
 #include <boost/numeric/ublas/vector_proxy.hpp>
@@ -58,7 +59,7 @@ NNLayer::Vector NNLayer::exec(const Vector& in) const { return act->f(potential(
 
 void NNLayer::randomize(Real lo, Real hi)
 {
-    boost::mt19937 rng;
+    static boost::mt19937 rng(time(0));
     boost::uniform_real<Real> dist(lo, hi);
     boost::variate_generator<boost::mt19937&, boost::uniform_real<> > random(rng, dist);
 
