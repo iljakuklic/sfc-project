@@ -90,7 +90,9 @@ class DataSet {
 
         /// Normalize the dataset using mean and stddev
         void normalize_all(FeatureVector m = FeatureVector(), FeatureVector s = FeatureVector());
-
+        
+        /// get data sample
+        const DataSample& sample(size_t i) const { return samples[i]; }
         /// data samples count
         size_t count() const;
         /// data mean
