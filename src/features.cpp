@@ -159,7 +159,7 @@ void DataSet::write_tmp(const std::string& filename) const
 
     std::ofstream ofs(filename.c_str());
     ofs << sum << ' ' << sumsq << ' ' << normalized << std::endl;
-    for (int i = 0; i < samples.size(); ++i)
+    for (size_t i = 0; i < samples.size(); ++i)
         ofs << samples[i].first << ' ' << samples[i].second << std::endl;
 }
 
