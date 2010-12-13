@@ -9,20 +9,104 @@
 
 #include "classifier.hpp"
 #include <iostream>
+#include <fstream>
 #include <iomanip>
 #include <boost/numeric/ublas/io.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/lexical_cast.hpp>
 
+using std::string;
+
+/// command-line params
 struct params {
-    void(*mode)(params&);
-    std::string prog;
+    typedef std::vector<string> StringList;
+
+    void(*mode)(params&);  // mode function pointer
+    string prog;           // program name
+    string out_file;       // neural net file
+    string cls_file;       // classifier filename
+    string data_dir;       // data dir to process
+    StringList files;      // classification files
+    StringList labels;     // data labels
+    bool verbose;          // verbosity
+    size_t hidden_neurons; // number of hidden neurons
+    size_t chunk_size;     // number of hidden neurons
 };
 
+/// write program help to stdout
 void prog_help(params& p)
 {
-    std::cout << p.prog << " <mode> <switches>" << std::endl
-              << " mode is one of: train, classify, dataset, help" << std::endl
-              << "" << std::endl
-              << "" << std::endl;
+    std::cout << p.prog << " <mode> <switches>\n"
+              "    mode is one of: train, classify, dataset, help\n"
+              "\n"
+              "\n"
+              << std::endl;
+}
+
+/// process data set
+void do_dataset(params& p)
+{
+    if (p.labels.size() == 0)  throw std::runtime_error("Specify desired labels.");
+    if (p.data_dir.empty())    throw std::runtime_error("Specify data directory.");
+    if (p.out_file.empty())    throw std::runtime_error("Specify output filename.");
+
+    DataSet data;
+    std::cout << "=== Loading data & extracting features" << std::endl;
+    data.load_dir(p.data_dir, p.labels);
+    std::cout << "=== Normalizing data" << std::endl;
+    data.normalize_all();
+    std::cout << "=== Shuffling data" << std::endl;
+    data.shuffle();
+    std::cout << "=== Writing data" << std::endl;
+    data.write_tmp(p.out_file);
+    std::cout << "=== DONE" << std::endl;
+}
+
+/// training
+void training(params& p)
+{
+    if (p.hidden_neurons == 0) throw std::runtime_error("Specify number of hidden layser neurons.");
+    if (p.out_file.empty())    throw std::runtime_error("Specify classifier output filename.");
+    if (p.files.size() != 3)   throw std::runtime_error("Specify training, testing and crossvalidation data file.");
+    if (p.labels.size() == 0)  throw std::runtime_error("Specify output labels.");
+
+    DataSet train, test, xval;
+    train.load_tmp(p.files[0]);
+    test.load_tmp(p.files[1]);
+    xval.load_tmp(p.files[2]);
+
+    NeuralNet nn(test.sample(0).first.size(), p.hidden_neurons, test.sample(0).second.size(), sigmoid_func, logsigmoid_func);
+    Classifier c;
+    Classifier::Teacher t(c, nn, train, test, xval);
+    t.teach(p.chunk_size, .02);
+    std::ofstream ofs(p.out_file.c_str());
+    ofs << c;
+}
+
+/// classification
+void classify(params& p)
+{
+    if (p.cls_file.empty())    throw std::runtime_error("Specify classifier filename.");
+    if (p.files.size() == 0)   throw std::runtime_error("Nothing to classify");
+
+    static const int barsize = 20;
+
+    Classifier c;
+    { std::ifstream ifs(p.cls_file.c_str()); ifs >> c; }
+
+    for (size_t i = 0; i < p.files.size(); ++i) {
+        DataSet data;
+        data.load(p.files[i]);
+
+        Classifier::Vector result = c.exec(data);
+
+        for (size_t l = 0; l < c.labels().size(); ++l) {
+            size_t marks = static_cast<int>(20 * std::exp(result(i)) + .5);
+            std::cout << std::setw(barsize) << c.labels()[l] << '[' << string(marks, '#') << string(barsize - marks, ' ') << ']' << std::endl;
+        }
+        std::cout << std::endl;
+    }
 }
 
 void foo(params& p)
@@ -45,7 +129,7 @@ void foo(params& p)
         //data.write_tmp(std::cout);
         std::cout << std::endl;
 
-        NeuralNet nn(2, 4, 1);
+        NeuralNet nn(data.sample(0).first.size(), 4, data.sample(0).second.size());
         Classifier::Teacher t(c, nn, data, data, data);
         t.teach(0, .02);
     }
@@ -54,14 +138,34 @@ void foo(params& p)
     while (std::cin >> v) std::cout << c.exec(v) << std::endl;
 }
 
+/// parse the commandline
 void parse_params(int argc, char** argv, params& p)
 {
     p.prog = argv[0];
+    p.verbose = false;
+    p.hidden_neurons = 0;
+    p.chunk_size = 20;
+
     if (argc < 2) throw std::runtime_error("Mode needs to be specified, try: " + p.prog + " help");
 
-    std::string str = argv[1];
+    string str = argv[1];
          if (str == "help") p.mode = prog_help;
     else if (str == "foo")  p.mode = foo;
+    else if (str == "dataset")  p.mode = do_dataset;
+    else throw std::runtime_error("Unknown mode: " + str);
+
+    for (int i = 2; i < argc; ++i) {
+        str = argv[i];
+             if (str == "-v") p.verbose = true;
+        else if (str == "-o") p.out_file = argv[++i];
+        else if (str == "-f") p.cls_file = argv[++i];
+        else if (str == "-d") p.data_dir = argv[++i];
+        else if (str == "-h") p.hidden_neurons = boost::lexical_cast<size_t>(argv[++i]);
+        else if (str == "-c") p.chunk_size     = boost::lexical_cast<size_t>(argv[++i]);
+        else if (str == "-l") boost::algorithm::split(p.labels, argv[++i], boost::algorithm::is_any_of(":"));
+        else if (str.substr(0, 1) == "-") throw std::runtime_error("Unrecognized commandline option: " + str);
+        else p.files.push_back(str);
+    }
 }
 
 int main(int argc, char** argv)
@@ -76,38 +180,6 @@ int main(int argc, char** argv)
         return 1;
     }
 
-
-/*
-    if (argc == 2) {
-        LabelList l; l.push_back("rock"); l.push_back("pop");
-        DataSet data;
-        std::cout << "load" << std::endl;
-        data.load_dir(argv[1], l);
-        std::cout << "normalize" << std::endl;
-        data.normalize_all();
-        std::cout << "shuffle" << std::endl;
-        data.shuffle();
-        std::cout << "write" << std::endl;
-        data.write_tmp("data.txt");
-        return 0;
-    }
-
-
-
-    NeuralNet::Teacher t(nn);
-    NeuralNet nn2 = nn;
-    std::cout << nn << std::endl;
-    std::cout << nn << std::endl;
-    while (std::cin >> v)
-        std::cout << nn2.exec(v) << " " << nn.exec(v) << std::endl;
-    if (argc != 2) return 1;
-    Features f(argv[1]);
-    for (size_t n = 0; n < f.frames(); ++n) {
-        const FeatureVector& v = f.feature(n);
-        std::cout << "Frame " << std::setw(4) << n << ": " << v;
-        std::cout << std::endl;
-    }
-*/
     return 0;
 }
 
