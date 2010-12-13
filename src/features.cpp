@@ -118,8 +118,13 @@ void DataSet::load(const std::string& filename_base, const LabelList& labels)
         AnnotationType a = load_annotations(filename_base + ".tag");
         out.resize(labels.size());
         // clamp every desired input and take logarithm
+        Real m = 1.0;
+        for (size_t i = 0; i < labels.size(); ++i) {
+            out[i] = a[labels[i]];
+            m = std::max(out[i], m);
+        }
         for (size_t i = 0; i < labels.size(); ++i)
-            out[i] = std::log(std::max(0.002, std::min(0.998, a[labels[i]] / 100.0)));
+            out[i] = std::log(std::max(0.002, std::min(0.998, out[i] / m)));
     }
 
     // load MFCC coefficients and associate them with desired output
@@ -138,8 +143,10 @@ void DataSet::load_dir(const std::string& dirname, const LabelList& labels)
     directory_iterator dirend;
     
     for (directory_iterator dir(dirpath); dir != dirend; ++dir)
-        if (dir->path().extension() == ".wav")
+        if (dir->path().extension() == ".wav") {
+            std::cout << "--- " << dir->path().string() << std::endl;
             load((dir->path().parent_path() / dir->path().stem()).string(), labels);
+        }
 }
 
 void DataSet::load_tmp(const std::string& filename)
