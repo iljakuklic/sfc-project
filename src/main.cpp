@@ -129,6 +129,23 @@ void classify(params& p)
     }
 }
 
+/// show features extracted from a file
+void show_features(params& p)
+{
+    if (p.files.size() == 0) throw std::runtime_error("Specify files to extract features from");
+
+    std::ofstream outfile(p.out_file.c_str());
+    std::ostream& os = (!p.out_file.empty() ? outfile : std::cout);
+
+    for (size_t i = 0; i < p.files.size(); ++i)
+    {
+        DataSet data;
+        data.load(p.files[i]);
+        for (size_t j = 0; j < data.count(); ++j)
+            os << data.sample(j).first << std::endl;
+    }
+}
+
 void foo(params& p)
 {
     Classifier c;
@@ -176,6 +193,7 @@ void parse_params(int argc, char** argv, params& p)
     else if (str == "dataset")  p.mode = do_dataset;
     else if (str == "train")    p.mode = training;
     else if (str == "classify") p.mode = classify;
+    else if (str == "features") p.mode = show_features;
     else throw std::runtime_error("Unknown mode: " + str);
 
     for (int i = 2; i < argc; ++i) {
