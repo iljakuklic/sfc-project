@@ -31,14 +31,15 @@ struct params {
     StringList labels;     // data labels
     bool verbose;          // verbosity
     size_t hidden_neurons; // number of hidden neurons
-    size_t chunk_size;     // number of hidden neurons
+    size_t chunk_size;     // size of BP learning chunks
+    size_t try_count;      // how many NNs to train to choose the best one
 };
 
 /// write program help to stdout
 void prog_help(params& p)
 {
     std::cout << p.prog << " <mode> <switches>\n"
-              "    mode is one of: train, classify, dataset, help\n"
+              "    mode is one of: train, classify, dataset, test, help\n"
               "\n"
               "\n"
               << std::endl;
@@ -68,20 +69,25 @@ void training(params& p)
 {
     if (p.hidden_neurons == 0) throw std::runtime_error("Specify number of hidden layser neurons.");
     if (p.out_file.empty())    throw std::runtime_error("Specify classifier output filename.");
-    if (p.files.size() != 3)   throw std::runtime_error("Specify training, testing and crossvalidation data file.");
+    if (p.files.size() < 1)    throw std::runtime_error("Specify training, testing and crossvalidation data file.");
     if (p.labels.size() == 0)  throw std::runtime_error("Specify output labels.");
 
     DataSet train, test, xval;
     train.load_tmp(p.files[0]);
-    test.load_tmp(p.files[1]);
-    xval.load_tmp(p.files[2]);
+    if (p.files.size() >= 2) test.load_tmp(p.files[1]);
+    if (p.files.size() >= 3) xval.load_tmp(p.files[2]);
 
-    NeuralNet nn(test.sample(0).first.size(), p.hidden_neurons, test.sample(0).second.size(), sigmoid_func, logsigmoid_func);
-    Classifier c;
-    Classifier::Teacher t(c, nn, train, test, xval);
-    t.teach(p.chunk_size, .02);
+    Classifier best_one;
+
+    for (size_t i = 0; i < p.try_count; ++i) {
+        NeuralNet nn(test.sample(0).first.size(), p.hidden_neurons, test.sample(0).second.size(), sigmoid_func, logsigmoid_func);
+        Classifier c;
+        Classifier::Teacher t(c, nn, train, (p.files.size() >= 2 ? test : train), ((p.files.size() >= 3) ? xval : train));
+        t.teach(p.chunk_size, .02);
+    }
+
     std::ofstream ofs(p.out_file.c_str());
-    ofs << c;
+    ofs << best_one;
 }
 
 /// classification
@@ -149,9 +155,11 @@ void parse_params(int argc, char** argv, params& p)
     if (argc < 2) throw std::runtime_error("Mode needs to be specified, try: " + p.prog + " help");
 
     string str = argv[1];
-         if (str == "help") p.mode = prog_help;
-    else if (str == "foo")  p.mode = foo;
+         if (str == "help")     p.mode = prog_help;
+    else if (str == "foo")      p.mode = foo;
     else if (str == "dataset")  p.mode = do_dataset;
+    else if (str == "train")    p.mode = training;
+    else if (str == "classify") p.mode = classify;
     else throw std::runtime_error("Unknown mode: " + str);
 
     for (int i = 2; i < argc; ++i) {
@@ -160,6 +168,7 @@ void parse_params(int argc, char** argv, params& p)
         else if (str == "-o") p.out_file = argv[++i];
         else if (str == "-f") p.cls_file = argv[++i];
         else if (str == "-d") p.data_dir = argv[++i];
+        else if (str == "-t") p.try_count      = boost::lexical_cast<size_t>(argv[++i]);
         else if (str == "-h") p.hidden_neurons = boost::lexical_cast<size_t>(argv[++i]);
         else if (str == "-c") p.chunk_size     = boost::lexical_cast<size_t>(argv[++i]);
         else if (str == "-l") boost::algorithm::split(p.labels, argv[++i], boost::algorithm::is_any_of(":"));
