@@ -14,6 +14,7 @@
 #include <boost/numeric/ublas/vector_proxy.hpp>
 #include <boost/numeric/ublas/io.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/algorithm/string.hpp>
 
 const unsigned FRAME_LENGTH = 30;
 const unsigned PARAMS_PER_FRAME = 15;
@@ -78,8 +79,9 @@ AnnotationType DataSet::load_annotations(const std::string& filename)
 
     while (ifs >> score) {
         getline(ifs, tag);
-        result[tag.substr(tag.find_first_not_of(' '))] = score;
-        //std::cout << tag.substr(tag.find_first_not_of(' ')) << ": " << score << std::endl;
+        tag = tag.substr(tag.find_first_not_of(' '));
+        boost::to_lower(tag);
+        result[tag] = score;
     }
 
     return result;
