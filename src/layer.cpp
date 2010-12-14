@@ -97,7 +97,7 @@ NNLayer::Vector NNLayer::input_vec(const Vector& in)
 }
 
 NNLayer::Teacher::Teacher(NNLayer& nn, bool randomize)
-    : dw(zero_matrix<Numeric>(nn.weights.size1(), nn.weights.size2())), layer(&nn)
+    : n_data(0), dw(zero_matrix<Numeric>(nn.weights.size1(), nn.weights.size2())), layer(&nn)
 {
     if (randomize) layer->randomize();
 }
@@ -109,14 +109,16 @@ void NNLayer::Teacher::sample(const Vector& in, const Vector& out, const Vector&
     assert(dout.size() == out.size());
     // compute weight deltas and add them to the dw matrix
     dw += outer_prod(input_vec(in), element_prod(layer->activation().df(in, *layer, out), dout));
+    ++n_data;
 }
 
 void NNLayer::Teacher::teach(Numeric learning_rate)
 {
     // update weights by dw * learning_rate
-    layer->weights += element_prod(scalar_matrix<Numeric>(dw.size1(), dw.size2(), learning_rate), dw);
+    layer->weights += element_prod(scalar_matrix<Numeric>(dw.size1(), dw.size2(), learning_rate / n_data), dw);
     // zero dw matrix
     dw = scalar_matrix<Numeric>(dw.size1(), dw.size2(), 0.0);
+    n_data = 0;
 }
 
 

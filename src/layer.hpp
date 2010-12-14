@@ -161,6 +161,7 @@ class NNLayer {
                 // get layer
                 const NNLayer& get_layer() const { return *layer; }
             private:
+                size_t n_data;  ///< data samples presented so far
                 Matrix dw;      ///< accumulated weight deltas
                 NNLayer* layer; ///< layer reference
         };
