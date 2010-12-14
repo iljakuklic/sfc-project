@@ -95,7 +95,7 @@ void Classifier::Teacher::present(size_t n, Real learning_rate)
 
 bool Classifier::Teacher::teach(size_t n, Real rate)
 {
-    const Real thres = 0.9999;
+    const Real thres = 0.995;
     int max_iter = 10000, iter = 0;
     int miss = 0; // miss count
     Real err = 0.0, olderr = xval_error(), err_ratio;
@@ -107,15 +107,25 @@ bool Classifier::Teacher::teach(size_t n, Real rate)
         if (iter > 3 && err > initerr) return false;
         iter++;
 
+        NeuralNet bak = cls.nn; // save backup
+
         std::cout << "Miss: " << miss << ", Error: " << err << ", Rate: " << rate << std::endl;
 
         present(n, rate);   // training iteration
         err = xval_error(); // classifier error
         err_ratio = err / olderr;
+
         if (err_ratio > thres) ++miss;
         else miss = 0;
-        if (miss) rate *= 0.5; // adjust learning rate
-        //else if (err_ratio < .5) rate *= 2.0;
+
+        if (miss) {
+            rate *= 0.5; // adjust learning rate
+            if (err_ratio > 1.0) {
+                cls.nn = bak;  // restore backup if error increased
+                net = NetTeacherPtr(new NeuralNet::Teacher(cls.nn, false)); // re-initialize teacher
+            }
+        }
+
         olderr = err;
     }
 

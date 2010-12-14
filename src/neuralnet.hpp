@@ -51,7 +51,7 @@ class NeuralNet {
                 typedef std::vector<NNLayer::Teacher*> LayerTeacherArray;
 
                 /// New network learning context
-                explicit Teacher(NeuralNet& nn);
+                explicit Teacher(NeuralNet& nn, bool randomize = true);
                 /// Destructor
                 ~Teacher();
                 /// present sample vector and its desired output

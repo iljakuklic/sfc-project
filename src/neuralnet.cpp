@@ -71,11 +71,11 @@ std::ostream& operator<<(std::ostream& os, const NeuralNet& nn)
 
 
 
-NeuralNet::Teacher::Teacher(NeuralNet& nn)
+NeuralNet::Teacher::Teacher(NeuralNet& nn, bool randomize)
 {
     teachers.resize(nn.layers.size());
     for (size_t i = 0; i < nn.layers.size(); ++i)
-        teachers[i] = (new NNLayer::Teacher(nn.layers[i]));
+        teachers[i] = (new NNLayer::Teacher(nn.layers[i], randomize));
 }
 
 NeuralNet::Teacher::~Teacher()
