@@ -163,6 +163,7 @@ class NNLayer {
             private:
                 size_t n_data;  ///< data samples presented so far
                 Matrix dw;      ///< accumulated weight deltas
+                Matrix w2;      ///< previous weight matrix
                 NNLayer* layer; ///< layer reference
         };
 

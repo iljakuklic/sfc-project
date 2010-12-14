@@ -100,6 +100,7 @@ NNLayer::Teacher::Teacher(NNLayer& nn, bool randomize)
     : n_data(0), dw(zero_matrix<Numeric>(nn.weights.size1(), nn.weights.size2())), layer(&nn)
 {
     if (randomize) layer->randomize();
+    w2 = nn.weights;
 }
 
 void NNLayer::Teacher::sample(const Vector& in, const Vector& out, const Vector& dout)
@@ -114,8 +115,13 @@ void NNLayer::Teacher::sample(const Vector& in, const Vector& out, const Vector&
 
 void NNLayer::Teacher::teach(Numeric learning_rate)
 {
-    // update weights by dw * learning_rate
-    layer->weights += element_prod(scalar_matrix<Numeric>(dw.size1(), dw.size2(), learning_rate / n_data), dw);
+    // momentum constant
+    static const Real momentum = 0.1;
+    // update weights by dw * learning_rate + momnetum * (weight - prev_weight)
+    Matrix update = element_prod(scalar_matrix<Numeric>(dw.size1(), dw.size2(), learning_rate / n_data), dw)
+                  + element_prod(scalar_matrix<Numeric>(dw.size1(), dw.size2(), momentum), layer->weights - w2);
+    w2 = layer->weights; // store previous weights
+    layer->weights += update;
     // zero dw matrix
     dw = scalar_matrix<Numeric>(dw.size1(), dw.size2(), 0.0);
     n_data = 0;
