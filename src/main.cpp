@@ -83,20 +83,20 @@ void training(params& p)
     Classifier best_one;
     Real best_err = -1.0;
 
-    std::cout << "=== Loading data" << std::endl;
-
     for (size_t i = 0; i < p.try_count; ++i) {
         std::cout << "--- Classifier #" << (i + 1) << std::endl;
         NeuralNet nn(train.sample(0).first.size(), p.hidden_neurons, train.sample(0).second.size(), sigmoid_func, logsigmoid_func);
         Classifier c;
         Classifier::Teacher t(c, nn, p.labels, train, test, xval);
-        t.teach(p.chunk_size, .5);
+        if (!t.teach(p.chunk_size, .5)) continue;
 
         Real err = c.error(test);
         if (best_err < 0.0 || best_err > err) {
             best_err = err;
             best_one = c;
         }
+        std::ofstream ofs((p.out_file + "." + boost::lexical_cast<string>(i+1)).c_str());
+        ofs << c;
     }
 
     std::cout << "=== Writing neural net" << std::endl;
@@ -110,20 +110,27 @@ void classify(params& p)
     if (p.cls_file.empty())    throw std::runtime_error("Specify classifier filename.");
     if (p.files.size() == 0)   throw std::runtime_error("Nothing to classify");
 
-    static const int barsize = 20;
+    static const int barsize = 40;
 
     Classifier c;
     { std::ifstream ifs(p.cls_file.c_str()); ifs >> c; }
 
     for (size_t i = 0; i < p.files.size(); ++i) {
+
+        std::cout << "=== " << p.files[i] << std::endl;
         DataSet data;
         data.load(p.files[i]);
 
         Classifier::Vector result = c.exec(data);
+        std::cout << "--- " << result << std::endl;
 
         for (size_t l = 0; l < c.labels().size(); ++l) {
-            size_t marks = static_cast<int>(20 * std::exp(result(i)) + .5);
-            std::cout << std::setw(barsize) << c.labels()[l] << '[' << string(marks, '#') << string(barsize - marks, ' ') << ']' << std::endl;
+            Real r = std::exp(result(l));
+            r = r * (2.0 - r);
+            r = std::sqrt(r);
+            int marks = static_cast<int>(barsize * r + .5);
+            std::cout << std::setw(15) << c.labels()[l] << " [" << string(marks, '#') << string(barsize - marks, ' ') << "]"
+                      << std::setw(5) << static_cast<int>(r * 100 + .5) << '%' << std::endl;
         }
         std::cout << std::endl;
     }
