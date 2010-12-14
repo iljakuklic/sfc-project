@@ -112,9 +112,19 @@ FeatureVector DataSet::stddev() const
 
 DataSet::DataSet() : /*labels(l),*/ normalized(false) {}
 
-void DataSet::load(const std::string& filename_base, const LabelList& labels)
+void DataSet::load(const std::string& filename_base_in, const LabelList& labels)
 {
     FeatureVector out;
+
+    std::string filename_base(filename_base_in);
+
+    // strip possible .wav
+    size_t pos = filename_base.find(".wav");
+    if (pos == filename_base.length() - std::string(".wav").length())
+        filename_base = filename_base.substr(0, pos);
+
+    if (!boost::filesystem::exists(boost::filesystem::path(filename_base + ".wav")))
+        throw std::runtime_error("Wave file '" + filename_base + ".wav' does not exist.");
 
     if (labels.size() != 0) {
         AnnotationType a = load_annotations(filename_base + ".tag");
