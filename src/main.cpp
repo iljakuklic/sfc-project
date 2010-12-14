@@ -72,20 +72,32 @@ void training(params& p)
     if (p.files.size() < 1)    throw std::runtime_error("Specify training, testing and crossvalidation data file.");
     if (p.labels.size() == 0)  throw std::runtime_error("Specify output labels.");
 
+    std::cout << "=== Loading data" << std::endl;
     DataSet train, test, xval;
     train.load_tmp(p.files[0]);
     if (p.files.size() >= 2) test.load_tmp(p.files[1]);
     if (p.files.size() >= 3) xval.load_tmp(p.files[2]);
 
     Classifier best_one;
+    Real best_err = -1.0;
+
+    std::cout << "=== Loading data" << std::endl;
 
     for (size_t i = 0; i < p.try_count; ++i) {
+        std::cout << "--- Classifier #" << (i + 1) << std::endl;
         NeuralNet nn(test.sample(0).first.size(), p.hidden_neurons, test.sample(0).second.size(), sigmoid_func, logsigmoid_func);
         Classifier c;
         Classifier::Teacher t(c, nn, train, (p.files.size() >= 2 ? test : train), ((p.files.size() >= 3) ? xval : train));
-        t.teach(p.chunk_size, .02);
+        t.teach(p.chunk_size, .5);
+
+        Real err = c.error(test);
+        if (best_err < 0.0 || best_err > err) {
+            best_err = err;
+            best_one = c;
+        }
     }
 
+    std::cout << "=== Writing neural net" << std::endl;
     std::ofstream ofs(p.out_file.c_str());
     ofs << best_one;
 }
@@ -151,6 +163,7 @@ void parse_params(int argc, char** argv, params& p)
     p.verbose = false;
     p.hidden_neurons = 0;
     p.chunk_size = 20;
+    p.try_count = 5;
 
     if (argc < 2) throw std::runtime_error("Mode needs to be specified, try: " + p.prog + " help");
 
