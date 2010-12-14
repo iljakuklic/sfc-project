@@ -66,7 +66,7 @@ class Classifier {
                  * @param test testing data set
                  * @param xval crossvalidation data set
                  */
-                explicit Teacher(Classifier& c, const NeuralNet& network, DataSetRef train, DataSetRef test, DataSetRef xval);
+                explicit Teacher(Classifier& c, const NeuralNet& network, const LabelList& l, DataSetRef train, DataSetRef test, DataSetRef xval);
 
                 /**
                  * present several samples and propagate through the network

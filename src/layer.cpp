@@ -73,7 +73,7 @@ void NNLayer::load(std::istream& is)
     std::string actname;
     is >> actname >> weights;
     act = act_map[actname];
-    if (!act) throw std::runtime_error("Unknown activation function: " + actname);
+    //if (!act) throw std::runtime_error("Unknown activation function: '" + actname + "'");
 }
 
 void NNLayer::swap(NNLayer& l)

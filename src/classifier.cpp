@@ -48,9 +48,8 @@ Real Classifier::error(const DataSet& data) const
 void Classifier::load(std::istream& is)
 {
     std::string str;
-    getline(is, str);
+    is >> str >> mean_ >> stddev_ >> nn;
     boost::algorithm::split(labels_, str, boost::algorithm::is_any_of(LABEL_DELIM));
-    is >> mean_ >> stddev_ >> nn;
 }
 
 const Classifier::Vector&    Classifier::mean()       const { return mean_; }
@@ -67,13 +66,14 @@ std::ostream& operator<<(std::ostream& os, const Classifier& c)
 }
 
 
-Classifier::Teacher::Teacher(Classifier& c, const NeuralNet& network, DataSetRef train, DataSetRef test, DataSetRef xval) :
+Classifier::Teacher::Teacher(Classifier& c, const NeuralNet& network, const LabelList& l, DataSetRef train, DataSetRef test, DataSetRef xval) :
     cls(c), train(train), test(test), xval(xval)
 {
     if (train.count() == 0) throw std::runtime_error("No tarining data!");
     c.nn = network;
     c.mean_ = train.mean();
     c.stddev_ = train.stddev();
+    c.labels_ = l;
     c.labels_.resize(train.sample(0).second.size());
     net = NetTeacherPtr(new NeuralNet::Teacher(c.nn));
 }
@@ -96,25 +96,29 @@ void Classifier::Teacher::present(size_t n, Real learning_rate)
 bool Classifier::Teacher::teach(size_t n, Real rate)
 {
     const Real thres = 0.9999;
-    int max_iter = 10000;
+    int max_iter = 10000, iter = 0;
     int miss = 0; // miss count
     Real err = 0.0, olderr = xval_error(), err_ratio;
     Real initerr = olderr;
+    err = olderr;
 
     while (miss < 3) {
-        if (!--max_iter) return false;
+        if (iter >= max_iter) return false;
+        if (iter > 3 && err > initerr) return false;
+        iter++;
+
         std::cout << "Miss: " << miss << ", Error: " << err << ", Rate: " << rate << std::endl;
+
         present(n, rate);   // training iteration
         err = xval_error(); // classifier error
         err_ratio = err / olderr;
         if (err_ratio > thres) ++miss;
         else miss = 0;
         if (miss) rate *= 0.5; // adjust learning rate
-        else if (err_ratio < .98) rate *= 2.0;
+        //else if (err_ratio < .5) rate *= 2.0;
         olderr = err;
     }
 
-    if (err > initerr) return false;
     return true;
 }
 

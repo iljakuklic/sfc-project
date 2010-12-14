@@ -73,10 +73,12 @@ void training(params& p)
     if (p.labels.size() == 0)  throw std::runtime_error("Specify output labels.");
 
     std::cout << "=== Loading data" << std::endl;
-    DataSet train, test, xval;
+    DataSet train, test_d, xval_d;
     train.load_tmp(p.files[0]);
-    if (p.files.size() >= 2) test.load_tmp(p.files[1]);
-    if (p.files.size() >= 3) xval.load_tmp(p.files[2]);
+    if (p.files.size() >= 2) test_d.load_tmp(p.files[1]);
+    if (p.files.size() >= 3) xval_d.load_tmp(p.files[2]);
+    DataSet& xval = (xval_d.count() ? xval_d : train);
+    DataSet& test = (test_d.count() ? test_d : xval);
 
     Classifier best_one;
     Real best_err = -1.0;
@@ -85,9 +87,9 @@ void training(params& p)
 
     for (size_t i = 0; i < p.try_count; ++i) {
         std::cout << "--- Classifier #" << (i + 1) << std::endl;
-        NeuralNet nn(test.sample(0).first.size(), p.hidden_neurons, test.sample(0).second.size(), sigmoid_func, logsigmoid_func);
+        NeuralNet nn(train.sample(0).first.size(), p.hidden_neurons, train.sample(0).second.size(), sigmoid_func, logsigmoid_func);
         Classifier c;
-        Classifier::Teacher t(c, nn, train, (p.files.size() >= 2 ? test : train), ((p.files.size() >= 3) ? xval : train));
+        Classifier::Teacher t(c, nn, p.labels, train, test, xval);
         t.teach(p.chunk_size, .5);
 
         Real err = c.error(test);
@@ -148,7 +150,8 @@ void foo(params& p)
         std::cout << std::endl;
 
         NeuralNet nn(data.sample(0).first.size(), 4, data.sample(0).second.size());
-        Classifier::Teacher t(c, nn, data, data, data);
+        LabelList l; l.push_back("output");
+        Classifier::Teacher t(c, nn, l, data, data, data);
         t.teach(0, .02);
     }
 
@@ -163,7 +166,7 @@ void parse_params(int argc, char** argv, params& p)
     p.verbose = false;
     p.hidden_neurons = 0;
     p.chunk_size = 20;
-    p.try_count = 5;
+    p.try_count = 1;
 
     if (argc < 2) throw std::runtime_error("Mode needs to be specified, try: " + p.prog + " help");
 
