@@ -1,0 +1,185 @@
+\documentclass[10pt,a4paper]{article}
+
+\usepackage[left=2cm,text={17cm,24cm},top=3cm]{geometry}
+\usepackage[czech]{babel}
+\usepackage{ucs}
+\usepackage[utf8x]{inputenc}
+\usepackage[IL2]{fontenc}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{color}
+
+\lstset{numbers=left,showspaces=false,showstringspaces=false,inputencoding=utf8x,
+    basicstyle=\tt\footnotesize,numberstyle=\footnotesize,breaklines,breakatwhitespace,
+    identifierstyle=\textbf,keywordstyle=\bf\color{blue},
+    keywordstyle=[2]\bf\color{red},commentstyle=\color[gray]{.5},stringstyle=\color[rgb]{.4,.2,0},numberstyle=\color[gray]{.5},
+    includerangemarker=false,firstnumber=1}
+
+\title{Rozpoznání hudebného žánru z~nahrávky pomocí neuronové sítě}
+\author{Lukáš Kuklínek\\xkukli01@stud.fit.vutbr.cz}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Úvod}
+
+Rozpoznání hudebního žánru patří mezi úlohy, dokáže člověk v~jednoznačných případech řešit bez problémů.
+Strojová klasifikace stylů však již tak přímočará není.
+V~této práci se pokusíme popsat možný přístup k~řešení této úlohy.
+Budeme však rozpoznávat podmnožinu hudebních žánrů, které jsou víceméně dobře rozpoznatelné
+a~nevznikají velké spory o~zařazení nahrávek.
+
+\section{Návrh klasifikátoru}
+
+Samotný klasifikátor bude implementován pomocí neuronové sítě.
+Budeme potřebovat sadu trénovacích dat, ze které následně vyextrahujeme příznaky
+a~za pomoci připravených anotací jimi neuronovou síť natrénujeme.
+Pak ji bude možno použít k~rozpoznání žánru nových nahrávek.
+
+\subsection{Získání trénovacích dat a~anotací}
+
+Vstupními daty jsou nahrávky písniček ve formátu \verb|mp3| nebo \verb|ogg|.
+Tyto formáty obsahují jak vlastní zvuková data, tak i~metadata, především název
+skladby a~jejího autora či interpreta.
+
+Tyto informace použijeme k~automatickému získání anotací
+o~hudebním žánru ze serveru last.fm\footnote{\texttt{http://last.fm/}}.
+Anotace jsou uživately serveru zadané tagy, které je možno pomocí API získat ve formátu XML.
+Každý tag je ohodnocen číslem 1 až 100 na základě jeho četnosti.
+
+\subsection{Extrakce příznaků}
+
+Abychom si usnadnili práci při psaní programu,
+vstupní nahrávku nejdříve zkonverujeme do formátu \verb|wav|.
+Tu převedeme na příznaky MFCC\footnote{Mel-frequency Cepstral Coefficients}.
+Tyto příznaky jsou založeny na poznatcích psychoakustiky a~abstrahují
+další výpočet od fyzikálních vlastností zvuku.
+Výstupem je několik málo (v~našem případě 15) relativně dobře dekorelovaných koeficientů
+pro každých 20\,ms nahrávky.
+
+Abychom v~příznacích nepostihli pouze samotné spektrum, ale i~rychlost jeho změn,
+přidáme ke každému takovému vektoru ještě delta-MFCC, neboli rozdíl
+od předchozího MFCC vektoru v~nahrávce. První vektor zahodíme.
+Vstupní vektor pro neuronovou síť tedy bude mít 30 dimenzí.
+
+Celou trénovací sadu normalizujeme podle jejího průměru a~směrodatné odchylky.
+Poté na základě tohoto průměru a~směrodatné odchylky upravíme i~klasifikovaná data.
+
+$$ x' = \frac{x-\mu}{\sigma} $$
+
+\subsection{Struktura neuronové sítě}
+
+Bude se jednat o~třívrstvou neuronovou síť učenou pomocí zpětného šíření chyby.
+Počet vstupů již známe.
+Počet neuronů skryté vrstvy byl experimentálně určen na 18.
+
+Jejich aktivační funkce je normální logistická sigmoida ($\lambda = 1$):
+
+$$ \mbox{sig}(x) = \frac{1}{1+e^{-x}} $$
+
+Počet výstpů sítě bude roven počtu žánrů, které chceme rozpoznávat.
+Každý žánr tedy dostane skóre, které by mělo reflektovat, jak moc daná nahrávka
+do tohoto žánru náleží. Budeme tedy požadovat výstup v~intervalu $\left<0; 1\right>$.
+Abychom se vyhnuli extrémním hodnotám, data získaná z~last.fm jednoduše přeškálujeme
+do intervalo o~něco menšího, třeba $\left<0,005; 0,995\right>$. Brzy bude zřejmé, proč je především
+nenulová dolní mez důležitá.
+
+\paragraph{Kombinace výstupů} Neuronová síť odpoví na jeden vstupní vektor vektorem výstupním.
+Tento však reprezenruje pouhých 20\,ms nahrávky.
+Je nutné skóre všech vektorů nahrávky nějakým způsobem spojit ve výsledné ohodnocení.
+Pro průměrování skóre je, podobně jako pro pravděpodobnosti, mnohem přirozenější
+použít průměr geometrický nežli aritmetický.
+Geometrický průměr je pro množinu $\{a_1,a_2,\ldots,a_n\}$ definován takto:
+
+$$ \mbox{gm}(A) = \left(\prod_{i=1}^na_i\right)^{\frac{1}{n}} $$
+
+Velké množství násobení malých čísel by však znamenalo jednak výkonnostní
+penalizaci a~hlavně by se brzy v~neúnosné míře naakumulovaly numerické chyby.
+Je tedy lepší daný výpočet provést v~logaritmu, čímž geometrický průměr
+převedeme na průměr aritmetický:
+
+$$
+\ln\mbox{gm}(A)
+= \frac{1}{n}\ln\left(\prod_{i=1}^na_i\right)
+= \frac{1}{n}\left(\sum_{i=1}^n\ln(a_i)\right)
+$$
+
+Požadavek na logaritmický výstup můžeme za předpokladu příslušné úpravy (t.j.~zlogaritmování)
+na trénovacích datech zakódovat přímo do aktivační funkce výstupní vrstvy.
+Tou bude logaritmus logistické sigmoidy:
+
+$$ \ln\mbox{sig}(x) = \ln\frac{1}{1+e^{-x}} = -\ln(1 + e^{-x}) $$
+
+Derivaci lze vyjádřit na základě hodnoty funkce v~daném bodě:
+
+$$ (\ln\mbox{sig}(x))' = \frac{1}{1+e^{x}} = 1-e^{-\ln(1 + e^{-x})} = 1 - e^{\ln\mathrm{sig}(x)} $$
+
+\subsection{Trénování sítě}
+
+K~trénování sítě si připravíme tři sady dat: trénovací, krosvalidační a testovací.
+Síť je trénována pomocí algoritmu \emph{backpropagation} po jednotlivých vrstvách.
+Všechny datové sady jsou nejdříve normalizovány podle průměru a~směrodatné odchylky
+trénovacích dat. Trénovací data obsahující příznakové vektory množství nahrávek různých
+žánrů náhodně promícháme, aby nebyla data z~jedné nahrávky, a~tedy velmi podobná,
+předkládána mnohokrát po sobě.
+
+Vrstva je reprezentována pomocí matice vah jednotlivých neuronů.
+Při učení je jí přiřazena ještě akumulační matice chyb vah.
+Ta je po předložení několika vzorků z~trénovací sady
+pronásobena konstantou rychlosti učení a~přičtena k~matici vah vrstvy.
+Taktéž je přičtena malá část rozdílu aktuální a~předchozí matice vah,
+čímž je implementována jistá setrvačnost učení aka \emph{momentum}.
+Síti je předložen trénovací vektor spolu s~požadovaným výstupním vektorem,
+je spočtena odezva a~chyba se postupně předává jednotlivým vrstvám.
+
+Zastavení trénování a~také ochranu proti přetrénování řeší algoritmus \emph{New Bob} \cite{newbob}.
+Kelsne-li chyba sítě po jedné iteraci učení na krosvalidačních datech o~méně než půl procenta,
+sníží se rychlost učení na polovinu. Klesne-li chyba podruhé v~řadě o~méně než půl procenta,
+učení je u~konce.
+
+Vzhledem k~tomu, že počáteční váhy jsou vybrány náhodně,
+má cenu natrénovat více neuronoých sítí a~vybrat tu nejlepší.
+K~ohodnocení kvality výsledného klasifikátoru a~porovnání s~ostatními
+je použita metrika chyby na testovacích datech.
+
+\subsection{Klasifikace}
+
+Klasifikátor tedy na základě natrénovaných matic vah přiřadí každému vektoru nahrávky logaritmické skóre pro každý
+hudební žánr. Jednotlivá skóre zprůměruje a~poté na tento průměr aplikuje funkci $e^x$,
+aby byl výsledek zase v~rozsahu $\left<0; 1\right>$.
+Tím dosáhneme lepší interpretovatelnosti výsledku člověkem a~otevřou se i~zajímavější možnosti pro vizualizaci
+výsledného skóre.
+
+\section{Některé implementační detaily}
+% (de)serializace
+% dataset file (s fičurama)
+% knihovna pro extrakci MFCC
+% skripty pro práci s daty (použité nástroje)
+% neuronová síť: knihovna uBLAS
+% stdlib, boost
+\section{Výsledky experimentů}
+% rap problem
+%\section{Uživatelský manuál}
+% překlad
+% příprava datové sady
+% trénování
+% klasifikace
+\section{Závěr}
+% možná vylepšení: data, fičury
+
+\vfill
+%\newpage
+\begin{thebibliography}{9}
+  \bibitem{mfcc} Steven B. Davis. Paul Mermelstein.
+                 \emph{Comparison of Parametric Representations for Monosyllabic Word Recognition in Continuously Spoken Sentences}.
+                 IEEE Transactions on Acoustics, Speech, and Signal Processing, 28(4), pp. 357–366. 1980.
+  \bibitem{newbob} Bob New. Kevin Shaw. \emph{Neural Networks -- Setup and Configuration}. Oregon Graduate Institute.
+\end{thebibliography}
+
+\newpage
+\appendix
+
+\end{document}
