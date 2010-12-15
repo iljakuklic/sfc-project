@@ -1,4 +1,4 @@
-\documentclass[10pt,a4paper]{article}
+\documentclass[10pt,a4paper,twocolumn]{article}
 
 \usepackage[left=2cm,text={17cm,24cm},top=3cm]{geometry}
 \usepackage[czech]{babel}
@@ -10,7 +10,7 @@
 \usepackage{listings}
 \usepackage{color}
 
-\lstset{numbers=left,showspaces=false,showstringspaces=false,inputencoding=utf8x,
+\lstset{showspaces=false,showstringspaces=false,inputencoding=utf8x,
     basicstyle=\tt\footnotesize,numberstyle=\footnotesize,breaklines,breakatwhitespace,
     identifierstyle=\textbf,keywordstyle=\bf\color{blue},
     keywordstyle=[2]\bf\color{red},commentstyle=\color[gray]{.5},stringstyle=\color[rgb]{.4,.2,0},numberstyle=\color[gray]{.5},
@@ -56,7 +56,7 @@ Abychom si usnadnili práci při psaní programu,
 vstupní nahrávku nejdříve zkonverujeme do formátu \verb|wav|.
 Tu převedeme na příznaky MFCC\footnote{Mel-frequency Cepstral Coefficients}.
 Tyto příznaky jsou založeny na poznatcích psychoakustiky a~abstrahují
-další výpočet od fyzikálních vlastností zvuku.
+další výpočet od fyzikálních vlastností zvuku \cite{mfcc}.
 Výstupem je několik málo (v~našem případě 15) relativně dobře dekorelovaných koeficientů
 pro každých 20\,ms nahrávky.
 
@@ -66,7 +66,7 @@ od předchozího MFCC vektoru v~nahrávce. První vektor zahodíme.
 Vstupní vektor pro neuronovou síť tedy bude mít 30 dimenzí.
 
 Celou trénovací sadu normalizujeme podle jejího průměru a~směrodatné odchylky.
-Poté na základě tohoto průměru a~směrodatné odchylky upravíme i~klasifikovaná data.
+Poté na základě tohoto průměru a~směrodatné odchylky upravíme i~klasifikovaná data \cite{nnfaq}.
 
 $$ x' = \frac{x-\mu}{\sigma} $$
 
@@ -84,7 +84,7 @@ Počet výstpů sítě bude roven počtu žánrů, které chceme rozpoznávat.
 Každý žánr tedy dostane skóre, které by mělo reflektovat, jak moc daná nahrávka
 do tohoto žánru náleží. Budeme tedy požadovat výstup v~intervalu $\left<0; 1\right>$.
 Abychom se vyhnuli extrémním hodnotám, data získaná z~last.fm jednoduše přeškálujeme
-do intervalo o~něco menšího, třeba $\left<0,005; 0,995\right>$. Brzy bude zřejmé, proč je především
+do intervalu o~něco menšího, třeba $\left<0,005; 0,995\right>$. Brzy bude zřejmé, proč je především
 nenulová dolní mez důležitá.
 
 \paragraph{Kombinace výstupů} Neuronová síť odpoví na jeden vstupní vektor vektorem výstupním.
@@ -153,22 +153,144 @@ aby byl výsledek zase v~rozsahu $\left<0; 1\right>$.
 Tím dosáhneme lepší interpretovatelnosti výsledku člověkem a~otevřou se i~zajímavější možnosti pro vizualizaci
 výsledného skóre.
 
-\section{Některé implementační detaily}
-% (de)serializace
-% dataset file (s fičurama)
-% knihovna pro extrakci MFCC
-% skripty pro práci s daty (použité nástroje)
-% neuronová síť: knihovna uBLAS
-% stdlib, boost
+\section{Implementační detaily}
+\label{impl}
+
+Klasifikátor je napsán v~jazyce C++ a~používá několik knihoven.
+
+Knihovna \emph{Boost.uBLAS}\footnote{\texttt{http://www.boost.org/doc/libs/release/libs/numeric}}
+poskytuje sadu rutin pro práci s~vektory a~maticemi.
+Je použita pro samotnou implementaci neuronové sítě.
+Dokáže také vektory a~matice ukládat do souborů a~pak je z~něj načíst.
+Tato vlastnost je využita k~serializaci a~deserializaci natrénovaného klasifikátoru.
+
+Pro extrakci příznaků MFCC je použita knihovna \emph{Aquila DSP}\footnote{\texttt{http://aquila-dsp.org/}}.
+Implementace se neukázala být příliš efektivní, proto byl navržen souborový formát,
+který uloží datovou sadu nahrávek již v~podobě vektoru příznaků s~vektorem očekávaného výstupu.
+Na této sadě je pak možno trénovat více klasifikátorů, aniž by musely být z~nahrávek
+znovu extrahovány koeficienty MFCC.
+
+Různé podpůrné funkce, jako práce s~řetězci, procházení filesystémemu a~generování pseudonáhodných čísel, jsou realizovány
+za pomoci standardní knihovny jazyka C++, případně příslušných knihoven ze sady \emph{Boost}\footnote{\texttt{http://boost.org/}}.
+
+O~předzpracování datové sady se stará \emph{Makefile}\footnote{\texttt{http://www.gnu.org/software/make/}}.
+Ten jednak volá skript pro získání anotací, využívající k~tomuto účelu nástroj \emph{curl}\footnote{\texttt{http://curl.haxx.se/}}
+a~\emph{taglib}\footnote{\texttt{http://developer.kde.org/~wheeler/taglib.html}},
+a~jednak využívá příkaz \emph{ffmpeg}\footnote{\texttt{http://www.ffmpeg.org/}} ke konverzi audioformátů.
+
 \section{Výsledky experimentů}
-% rap problem
-%\section{Uživatelský manuál}
-% překlad
-% příprava datové sady
-% trénování
-% klasifikace
+
+Pro experimenty byla vybrána množina nahrávek různých žánrů a~to konkrétně následujících pět:
+
+\begin{enumerate}
+\item pop
+\item rock
+\item classical (vážná hudba)
+\item electronic (techno \& spol.)
+\item rap
+\end{enumerate}
+
+Testovací data neobsahovala žádnou nahrávku z~trénovacích ani krosvalidačních dat,
+obsahovala však několik nahrávek od stejných interpretů.
+Klasifikátor ve většině případů přiřadil správnému žánru nejvyšší skóre.
+
+Popové skladby dostávaly často vysoké rockové či elektronické skóre (i~vyšší ohodnocení než pop),
+protože mají těmto žánrům blízko použitím kytar či syntetizátorů.
+Problém nastal s~rapem, který je patrně těžké odlišit od rocku či elektroniky
+pouze na základě spektrální analýzy.
+Rapeři totiž často používají různě remixované samply více či méně slavných rockových kapel.
+Spolehlivě je rozpoznána nahrávka Eminema,
+u~kterého se však klasifikátor mohl natrénovat na hlas interpreta.
+
+Naopak typicky elektronické skladby a~vážná hudba jsou rozpoznány velmi dobře.
+Rockové skladby mají rockové skóre o~dost vyšší, než skóre ostatních žánrů,
+ale i~nerockové skladby mají často vysoké rockové skóre.
+To může být způsobeno rozbalancováním trénovacích dat,
+protože moje sbírka písní rockových interpretů je mnohem rozsáhlejší
+než u~ostatních žánrů.
+
+\section{Uživatelský manuál}
+
+\subsection{Překlad}
+
+Budou potřeba všechny knihovny popsané v~sekci \ref{impl}. Knihovnu \emph{Aquila DSP}
+je třeba stáhnout a~přeložit v~pod\-adresáři \verb|aquila| v~kořenovém adresáři projektu.
+
+Klasifikátor poté přeložíme následovně (předpokládáme, že pracovní adresář je kořenový adresář projektu):
+
+\begin{lstlisting}
+mkdir build
+cd build
+cmake ..
+make
+\end{lstlisting}
+
+\subsection{Příprava datové sady}
+
+Pro trénovací, testovací a~krosvalidační data je vyčleněn adresář \verb|data|.
+Ten připravíme takto:
+
+\begin{lstlisting}[language=sh]
+# predpokladame korenovy adresar projektu
+cd data
+# adersar pro trenovaci data
+mkdir train
+cd train
+# kopirujeme ci nalinkujeme trenovaci data
+ln -s /nejaka/nahravka.mp3
+ln -s ../scripts/features.make Makefile
+make
+\end{lstlisting}
+
+Výsledkem příkazu \verb|make| je soubor \verb|features.dat|
+s~normalizovanou a~náhodně promíchanou datovou sadou.
+Provádí získání anotací ze serveru \emph{last.fm},
+převod anotací, konverzi audioformátu na \verb|wav|
+a~následné vytvoření samotné datové sady.
+Obdobný postup provedeme i~pro adresáře \verb|xval| a~\verb|test|
+pro krosvalidační a~testovací data.
+
+\newpage
+\subsection{Použití}
+
+\subsubsection{Trénování}
+
+Součástí distribuce projektu již je jedna natrénovaná síť.
+Jedná se o~soubor \verb|cls.nn| v~kořenovém adresáři projektu.
+K natrénování vlastní sítě slouží následující příkaz:
+
+\begin{lstlisting}[language=sh]
+# v adresari build:
+./genre train \
+  -l pop:rock:classical:electronic:rap \
+  -o cls.nn \ # vysledny soubor se siti
+  -h 18 \     # pocet skrytych neuronu
+  "../data/train/features.dat" \
+  "../data/test/features.dat" \
+  "../data/xval/features.dat"
+\end{lstlisting}
+
+Jestliže jsou vynechána krosvalidační data, použijí se místo nich testovací.
+Jestliže jsou vynechána i~testovací data, použje jako krosvalidační i~testovací data
+trénovací sada (nedoporučuje se).
+
+\subsubsection{Klasifikace}
+
+\begin{lstlisting}[language=sh]
+./genre classify -f cls.nn nahravka.wav
+\end{lstlisting}
+
+V~rámci jednoho volání příkazu je možno klasifikovat i~více nahrávek.
+
 \section{Závěr}
-% možná vylepšení: data, fičury
+
+Klasifikátor dokázal většinu testovacích nahrávek rozpoznat,
+stále však je velký prostor ke zlepšení.
+Největší potenciál nejspíše leží v~množství trénovacích dat
+a~v~lepším výběru příznaků. Spektrální analýza dvacetimilisekundových
+úseků nahrávky totiž nepostihuje rytmické a~melodické vlastnosti zvuku.
+To jsou právě ty, které by dokázaly mnohem lépe diskriminovat
+například rock a~rap.
 
 \vfill
 %\newpage
@@ -177,6 +299,7 @@ výsledného skóre.
                  \emph{Comparison of Parametric Representations for Monosyllabic Word Recognition in Continuously Spoken Sentences}.
                  IEEE Transactions on Acoustics, Speech, and Signal Processing, 28(4), pp. 357–366. 1980.
   \bibitem{newbob} Bob New. Kevin Shaw. \emph{Neural Networks -- Setup and Configuration}. Oregon Graduate Institute.
+  \bibitem{nnfaq} Warren S. Sarle. \emph{Neural Network FAQ}. 2002. URL:~\verb|<ftp://ftp.sas.com/pub/neural/FAQ.html>|.
 \end{thebibliography}
 
 \newpage
