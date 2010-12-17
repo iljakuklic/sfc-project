@@ -1,4 +1,4 @@
-\documentclass[10pt,a4paper,twocolumn]{article}
+\documentclass[10pt,a4paper]{article}
 
 \usepackage[left=2cm,text={17cm,24cm},top=3cm]{geometry}
 \usepackage[czech]{babel}
@@ -210,24 +210,37 @@ Testovací data neobsahovala žádnou nahrávku z~trénovacích ani krosvalidač
 obsahovala však několik nahrávek od stejných interpretů.
 Učiníme-li ,,hard decision``, tedy uvažujeme pouze nejvyšší skóre a~toto srovnáme
 s~očekávaným výsledkem, dokázal klasifikátor správně rozpoznat 19 nahrávek z~23.
-To považuji vzhledem k~jednoduché architekruře klasifikátoru a~přímočarým příznakům
+To považuji vzhledem k~jednoduché architektuře klasifikátoru a~přímočarým příznakům
 za slušný výsledek. Nutno však uznat, že testovací sada obsahovala minimum
 nahrávek se sporným zařazením či jinou možnou nesnází.
 
-Popové skladby dostávaly často vysoké rockové či elektronické skóre (i~vyšší ohodnocení než pop),
+\newpage
+Poznatky z~bližší analýzy výstupu klasifikátoru se dají
+shrnout do několika bodů:
+
+\begin{itemize}
+\item Popové skladby dostávaly často vysoké rockové či elektronické skóre (i~vyšší ohodnocení než pop),
 protože mají těmto žánrům blízko použitím kytar či syntetizátorů.
-Problém nastal s~rapem, který je patrně těžké odlišit od rocku či elektroniky
+Například Michael Jackson je špatně klasifikován právě díky použití rockových nástrojů
+(výrazná basová kytara etc.), naproti tomu Britney Spears či Gwen Stefani používají hodně elektroniky.
+\item Problém nastal s~rapem, který je patrně těžké odlišit od rocku či elektroniky
 pouze na základě spektrální analýzy.
 Rapeři totiž často používají různě remixované samply více či méně slavných rockových kapel.
 Spolehlivě je rozpoznána nahrávka Eminema,
 u~kterého se však klasifikátor mohl natrénovat na hlas interpreta.
-
-Naopak typicky elektronické skladby a~vážná hudba jsou rozpoznány velmi dobře.
-Rockové skladby mají rockové skóre o~dost vyšší, než skóre ostatních žánrů,
+Nicméně i~několik dalších skladeb patřících do žánru \emph{rap} je také rozpoznáno správně.
+\item Typicky elektronické skladby a~vážná hudba jsou rozpoznány velmi dobře a~spolehlivě.
+Frekvenční charakteristika nástrojů používaných ve vážné hudbě je dostatečně rozdílná od
+ostatních žánrů, takže nahrávky Bacha či Smetany dosahují vysokého skóre na výstupu
+náležícímu třídě \emph{classical} a~nízké skóre na ostatních výstupech.
+\item Rockové skladby mají rockové skóre o~dost vyšší, než skóre ostatních žánrů,
 ale i~nerockové skladby mají často vysoké rockové skóre.
 To může být způsobeno rozbalancováním trénovacích dat,
 protože moje sbírka písní rockových interpretů je mnohem rozsáhlejší
 než u~ostatních žánrů.
+\item Rockové klasiky jako Smoke on the~Water od Deep Purple nebo skladby kapely Pink Floyd
+jsou rozpoznány spolehlivě.
+\end{itemize}
 
 \section{Uživatelský manuál}
 
@@ -270,6 +283,7 @@ a~následné vytvoření samotné datové sady.
 Obdobný postup provedeme i~pro adresáře \verb|xval| a~\verb|test|
 pro krosvalidační a~testovací data.
 
+\newpage
 \subsection{Použití}
 
 Překladem projektu vznikne binární spustitelný soubor
@@ -289,9 +303,9 @@ K natrénování vlastní sítě slouží následující příkaz:
   -l pop:rock:classical:electronic:rap \
   -o cls.nn \ # vysledny soubor se siti
   -h 18 \     # pocet skrytych neuronu
-  "../data/train/features.dat" \
-  "../data/test/features.dat" \
-  "../data/xval/features.dat"
+  "../data/train/features.dat" \   # trenovaci data
+  "../data/test/features.dat" \    # testovaci data
+  "../data/xval/features.dat"      # krosvalidacni data
 \end{lstlisting}
 
 Jestliže jsou vynechána krosvalidační data, použijí se místo nich testovací.
