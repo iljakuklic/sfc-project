@@ -16,7 +16,7 @@
     keywordstyle=[2]\bf\color{red},commentstyle=\color[gray]{.5},stringstyle=\color[rgb]{.4,.2,0},numberstyle=\color[gray]{.5},
     includerangemarker=false,firstnumber=1}
 
-\title{Rozpoznání hudebného žánru z~nahrávky pomocí neuronové sítě}
+\title{Rozpoznání hudebního žánru z~nahrávky pomocí neuronové sítě}
 \author{Lukáš Kuklínek\\xkukli01@stud.fit.vutbr.cz}
 \date{}
 
@@ -57,8 +57,24 @@ vstupní nahrávku nejdříve zkonverujeme do formátu \verb|wav|.
 Tu převedeme na příznaky MFCC\footnote{Mel-frequency Cepstral Coefficients}.
 Tyto příznaky jsou založeny na poznatcích psychoakustiky a~abstrahují
 další výpočet od fyzikálních vlastností zvuku \cite{mfcc}.
+Jedná se o~stejné koeficienty, které se používají v~oblasti zpracování řeči
+nebo v~mobilních telefonech.
+
 Výstupem je několik málo (v~našem případě 15) relativně dobře dekorelovaných koeficientů
 pro každých 20\,ms nahrávky.
+
+Postup extrakce MFCC z~navzorkovaného vstupního signálu by se dal shrnout v~několika bodech \cite{mfccwiki}:
+
+\begin{enumerate}
+  \item Na základě okýnka vybere část signálu (například 20\,ms dlouhý úsek).
+  \item Energii signálu pronásobí překrývajícími se trojúhelníkovímy okýnky s~exponenciálně rostoucími rozestupy.
+        Tím se zahodí inforamce o~základním tónu a~zajistí se přirozenější logaritmické vnímání frekvencí
+        (i~z~pohledu hudební teorie: poměr frekvencí mezi dvěma sousedními půltóny je $2^{\frac{1}{12}}$).
+  \item Hodnoty z~předchozího bodu zlogaritmuje. To souvisí s~logaritmickým vnímáním hlasitosti u~lidského ucha.
+  \item Provede diskrétní kosinovou transformaci výsledného vektoru. Empiricky bylo zjištěno, že tato transformace
+        má za následek podobnou dekoleraci koeficientů, jako by byla na nějakou trénovací sadu zvuků aplikována
+        analýza hlavních komponent.
+\end{enumerate}
 
 Abychom v~příznacích nepostihli pouze samotné spektrum, ale i~rychlost jeho změn,
 přidáme ke každému takovému vektoru ještě delta-MFCC, neboli rozdíl
@@ -192,7 +208,11 @@ Pro experimenty byla vybrána množina nahrávek různých žánrů a~to konkré
 
 Testovací data neobsahovala žádnou nahrávku z~trénovacích ani krosvalidačních dat,
 obsahovala však několik nahrávek od stejných interpretů.
-Klasifikátor ve většině případů přiřadil správnému žánru nejvyšší skóre.
+Učiníme-li ,,hard decision``, tedy uvažujeme pouze nejvyšší skóre a~toto srovnáme
+s~očekávaným výsledkem, dokázal klasifikátor správně rozpoznat 19 nahrávek z~23.
+To považuji vzhledem k~jednoduché architekruře klasifikátoru a~přímočarým příznakům
+za slušný výsledek. Nutno však uznat, že testovací sada obsahovala minimum
+nahrávek se sporným zařazením či jinou možnou nesnází.
 
 Popové skladby dostávaly často vysoké rockové či elektronické skóre (i~vyšší ohodnocení než pop),
 protože mají těmto žánrům blízko použitím kytar či syntetizátorů.
@@ -250,8 +270,12 @@ a~následné vytvoření samotné datové sady.
 Obdobný postup provedeme i~pro adresáře \verb|xval| a~\verb|test|
 pro krosvalidační a~testovací data.
 
-\newpage
 \subsection{Použití}
+
+Překladem projektu vznikne binární spustitelný soubor
+s~názvem \verb|genre|. Ten má několikero módů.
+Pro více informací je možno vyvolat vestavěnou nápovědu
+příkazem \verb|./genre help|.
 
 \subsubsection{Trénování}
 
@@ -284,7 +308,7 @@ V~rámci jednoho volání příkazu je možno klasifikovat i~více nahrávek.
 
 \section{Závěr}
 
-Klasifikátor dokázal většinu testovacích nahrávek rozpoznat,
+Klasifikátor dokázal velkou část (kolem 80\,\%) testovacích nahrávek rozpoznat,
 stále však je velký prostor ke zlepšení.
 Největší potenciál nejspíše leží v~množství trénovacích dat
 a~v~lepším výběru příznaků. Spektrální analýza dvacetimilisekundových
@@ -298,8 +322,9 @@ například rock a~rap.
   \bibitem{mfcc} Steven B. Davis. Paul Mermelstein.
                  \emph{Comparison of Parametric Representations for Monosyllabic Word Recognition in Continuously Spoken Sentences}.
                  IEEE Transactions on Acoustics, Speech, and Signal Processing, 28(4), pp. 357–366. 1980.
+  \bibitem{mfccwiki} Wikipedia, the free encyclopedia. \emph{Mel\discretionary{-}{-}{-}frequency cepstrum}. 21 Oct 2010. URL:~http://en.wikipedia.org/wiki/Mel-frequency\_cepstrum.
   \bibitem{newbob} Bob New. Kevin Shaw. \emph{Neural Networks -- Setup and Configuration}. Oregon Graduate Institute.
-  \bibitem{nnfaq} Warren S. Sarle. \emph{Neural Network FAQ}. 2002. URL:~\verb|<ftp://ftp.sas.com/pub/neural/FAQ.html>|.
+  \bibitem{nnfaq} Warren S. Sarle. \emph{Neural Network FAQ}. 2002. URL:~ftp://ftp.sas.com/pub/neural/FAQ.html.
 \end{thebibliography}
 
 \newpage
