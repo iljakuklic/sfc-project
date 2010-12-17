@@ -40,8 +40,16 @@ void prog_help(params& p)
 {
     std::cout << p.prog << " <mode> <switches>\n"
               "    mode is one of: train, classify, dataset, test, help\n"
-              "\n"
-              "\n"
+              "    syntax for mode options is as follows:\n"
+              "      train -o <out_neural_net_file> -l <colon-separated_genre_labels> -h <hidden_neuron_count> <path_to/features.dat+>\n"
+              "          train neural network\n"
+              "          up to three feature datasets can be specified: training, testing, crossvalidation (in this order)\n"
+              "      classify -f <neural_net_file> <wav_file+>\n"
+              "          classify an audio record\n"
+              "      dataset -l <colon-separated_genre_labels> -d <dataset_directory> -o <output_feature_file>\n"
+              "          preprocess a dataset\n"
+              "      features <wav_file+>\n"
+              "          show features for given files\n"
               << std::endl;
 }
 
